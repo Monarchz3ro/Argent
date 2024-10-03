@@ -1,6 +1,6 @@
 class_name Command extends Node
 
-var flagtype: String = "mf" #either mf or clc
+var flagtype: String = "clc" #either mf or clc
 var invoke_spell: String
 var actor: Terminal
 var target: Terminal

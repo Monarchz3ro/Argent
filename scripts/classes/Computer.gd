@@ -10,7 +10,7 @@ func execute_command(command: String):
 	if not command:
 		return
 	
-	var opt = terminal.execute_binding(command)
+	var opt: Option = terminal.execute_binding(command)
 	
 	if not opt.status():
 		print(opt.err)

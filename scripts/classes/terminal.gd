@@ -65,7 +65,7 @@ func get_file_at_path(path: String) -> Option:
 	
 	#if opt is not a file, return an error
 	if opt.unwrap().type != "Filetype":
-		return Option.new(null, "Target is not a file!")
+		return Option.error("Target is not a file!")
 	
 	return opt
 
@@ -124,14 +124,17 @@ func create_passwd_shadow_group(etc_dir: Directory) -> void:
 	groupsfile.content = "monarch:00:monarch"
 
 func fill_up_bin(binary_folder: Directory) -> void:
-	#add in ls
-	var listdir: Filetype = Filetype.new("""
-	Compile-Time Crime
-	""")
-	listdir.metadata["executable_key"] = ls.new(self)
-	listdir.parent = bin
-	listdir.label = "ls"
-	binary_folder.children.append(listdir)
+	materialise_command(ls.new(self), "ls")
+	materialise_command(pwd.new(self), "pwd")
+	
+
+func materialise_command(comm: Command, with_name: String) -> Filetype:
+	var command: Filetype = Filetype.new(with_name)
+	command.metadata["executable_key"] = comm
+	command.label = with_name
+	command.parent = bin
+	bin.children.append(command)
+	return command
 
 func initialise() -> void:
 	root.permissions = "drwxr-x--x"
@@ -274,3 +277,12 @@ func rwxapi_list_dir(actor: String, target: Directory) -> Option:
 	#then send off the list of dirs
 	var children: Array[AbstractFS] = target.children
 	return Option.OK(children)
+
+##for directories
+#func rwxapi_change_dir(actor: String, target: Directory) -> Option:
+	#AbstractFS.panic("NOT IMPLEMENTED ERROR")
+	#return Option.error("")
+
+func rwxapi_present_working_dir(actor: String) -> Option:
+	var pwd: Directory = current_directory
+	return Option.OK(pwd)
