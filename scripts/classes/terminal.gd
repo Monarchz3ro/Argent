@@ -140,7 +140,6 @@ func initialise() -> void:
 	refresh_commands()
 	recognise_groups()
 	print("Initialisation finished.")
-	rwxapi_create_empty_file(self.active_user, self.root, "balls")
 
 func recognise_groups() -> void:
 	var groupsfile: Option = get_file_at_path("/etc/group")
@@ -179,9 +178,9 @@ func construct_default_fhs() -> void:
 	home = root.makedir_sys("home")
 	etc = root.makedir_sys("etc")
 	create_passwd_shadow_group(etc)
-	playerhome = home.makedir_sys("monarch")
-	playerhome.makedir_sys("desktop")
-	playerhome.makedir_sys("notes")
+	playerhome = home.makedir_sys("monarch", "dr-x--x--x", "monarch", "monarch")
+	playerhome.makedir_sys("desktop", "dr-x--x--x", "monarch", "monarch")
+	playerhome.makedir_sys("notes", "dr-x--x--x", "monarch", "monarch")
 	#current_directory = etc
 
 func execute_binding(command: String) -> Option:
