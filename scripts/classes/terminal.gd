@@ -2,8 +2,9 @@ class_name Terminal extends Node2D
 
 #region SYSTEM CRITICAL VARS
 var root: Directory = Directory.new()
-var autoboot_into: String = "monarch"
+var autoboot_into: String = "root"
 var active_user: String = autoboot_into
+var default_write_group: String = "root"
 var current_directory: Directory = root
 var stack_tracker: Array[String] = [root.label]
 var commands_dict: Dictionary
@@ -123,10 +124,10 @@ func create_passwd_shadow_group(etc_dir: Directory) -> void:
 	
 	groupsfile.content = "monarch:00:monarch"
 
-func fill_up_bin(binary_folder: Directory) -> void:
+func fill_up_bin() -> void:
 	materialise_command(ls.new(self), "ls")
 	materialise_command(pwd.new(self), "pwd")
-	
+	materialise_command(mkdir.new(self), "mkdir")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -175,7 +176,7 @@ func construct_default_fhs() -> void:
 	root.label = ""
 	root.parent = root
 	bin = root.makedir_sys("bin")
-	fill_up_bin(bin)
+	fill_up_bin()
 	boot = root.makedir_sys("boot")
 	lib = root.makedir_sys("lib")
 	home = root.makedir_sys("home")
@@ -278,11 +279,19 @@ func rwxapi_list_dir(actor: String, target: Directory) -> Option:
 	var children: Array[AbstractFS] = target.children
 	return Option.OK(children)
 
-##for directories
+# for directories
 #func rwxapi_change_dir(actor: String, target: Directory) -> Option:
 	#AbstractFS.panic("NOT IMPLEMENTED ERROR")
 	#return Option.error("")
 
-func rwxapi_present_working_dir(actor: String) -> Option:
-	var pwd: Directory = current_directory
-	return Option.OK(pwd)
+func rwxapi_present_working_dir() -> Option:
+	var present_dir: Directory = current_directory
+	return Option.OK(present_dir)
+
+func rwxapi_makedir_user(actor: String, create_where: Directory, with_name: String) -> Option:
+	#to create a directory in target, you must be able to "w" to that dir
+	if not rwxapi_allowed_to_perform(actor, create_where, "w"):
+		return Option.error("Forbidden write operation: cannot write to directory "+create_where.label)
+	
+	var dir: Directory = create_where.makedir_user(with_name, active_user, default_write_group)
+	return Option.OK(dir)

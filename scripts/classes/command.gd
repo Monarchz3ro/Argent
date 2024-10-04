@@ -15,6 +15,7 @@ func action(_actor: Terminal, _args: Array[String], _flags: Array[String]) -> Op
 
 func distill_flags(command: String) -> Array[Array]:
 	var commands: PackedStringArray = command.split(" ")
+	commands.remove_at(0)
 	var args_arr: Array[String] = []
 	var flags_arr: Array[String] = []
 	

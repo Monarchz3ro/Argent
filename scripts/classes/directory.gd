@@ -16,6 +16,17 @@ func makedir_sys(lbl: String, perms: String = "dr-x--x--x", owned: String = "roo
 	self.children.append(newdir)
 	return newdir
 
+func makedir_user(lbl: String, owned: String, in_group: String) -> Directory:
+	var newdir = Directory.new()
+	var perms: String = "drwxr-x--x"
+	newdir.label = lbl
+	newdir.permissions = perms
+	newdir.owned_by = owned
+	newdir.group = in_group
+	newdir.parent = self
+	self.children.append(newdir)
+	return newdir
+
 
 func writefile_sys(lbl: String, content: String, perms: String = "-r--------", owned: String = "root", in_group: String = "root") -> Filetype:
 	var newfile = Filetype.new(content)
