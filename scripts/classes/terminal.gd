@@ -128,6 +128,7 @@ func fill_up_bin() -> void:
 	materialise_command(ls.new(self), "ls")
 	materialise_command(pwd.new(self), "pwd")
 	materialise_command(mkdir.new(self), "mkdir")
+	materialise_command(cd.new(self), "cd")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -293,5 +294,25 @@ func rwxapi_makedir_user(actor: String, create_where: Directory, with_name: Stri
 	if not rwxapi_allowed_to_perform(actor, create_where, "w"):
 		return Option.error("Forbidden write operation: cannot write to directory "+create_where.label)
 	
+	#check if there are any dirs of the same name already in there
+	if with_name in create_where.get_children_names():
+		return Option.error("Filesystem object with the name "+with_name+" already exists!")
+	
 	var dir: Directory = create_where.makedir_user(with_name, active_user, default_write_group)
 	return Option.OK(dir)
+
+func rwxapi_changedir(go_where: String) -> Option:
+	var current_dir: Directory = self.current_directory
+	var target_opt: Option = current_dir.get_child_named(go_where)
+	if not target_opt.status():
+		return target_opt
+	
+	var target: Directory = target_opt.unwrap()
+	
+	#check if you're allowed to "x" that directory
+	if not rwxapi_allowed_to_perform(self.active_user, target, "x"):
+		return Option.error("Forbidden execute operation: Not allowed to enter Directory "+target.label)
+	
+	self.current_directory = target
+	stack_tracker.assign(self.current_directory.get_full_path_str().split("/"))
+	return Option.OK("OK")

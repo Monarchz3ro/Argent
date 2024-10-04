@@ -39,13 +39,15 @@ func writefile_sys(lbl: String, content: String, perms: String = "-r--------", o
 	return newfile
 
 func get_child_named(lbl: String) -> Option:
-	var Err: Option = Option.new()
-	Err.err = "No such child found!"
-	
 	for child in self.children:
 		if child.label == lbl:
-			Err.err = "OK"
-			Err.result = child
-			return Err
-		
-	return Err
+			return Option.OK(child)
+	return Option.error("No such child found!")
+
+func get_children_names() -> Array[String]:
+	var res: Array[String] = []
+	
+	for child in self.children:
+		res.append(child.label)
+	
+	return res
