@@ -129,6 +129,7 @@ func fill_up_bin() -> void:
 	materialise_command(pwd.new(self), "pwd")
 	materialise_command(mkdir.new(self), "mkdir")
 	materialise_command(cd.new(self), "cd")
+	materialise_command(rmdir.new(self), "rmdir")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -316,3 +317,18 @@ func rwxapi_changedir(go_where: String) -> Option:
 	self.current_directory = target
 	stack_tracker.assign(self.current_directory.get_full_path_str().split("/"))
 	return Option.OK("OK")
+
+func rwxapi_removedir(target: String) -> Option:
+	var target_path = self.current_directory.get_full_path_str() + target
+	var opt: Option = self.get_dir_at_path(target_path)
+	if not opt.status():
+		return opt
+	
+	var target_dir: Directory = opt.unwrap()
+	var target_parent: Directory = target_dir.parent
+	if not rwxapi_allowed_to_perform(self.active_user, target_parent, "w"):
+		return Option.error("Forbidden write operation: Cannot write to target's parent, thus cannot delete it.")
+	
+	target_parent.children.erase(target_dir)
+	target_dir.parent = null
+	return Option.OK(target_dir)

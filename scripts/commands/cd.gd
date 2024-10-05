@@ -9,13 +9,13 @@ func action(act: Terminal, args: Array[String], flags: Array[String]):
 		return Option.error("cd does not accept more than 1 argument.")
 #endregion
 
-	var target: String
+	var target_str: String
 	if not args:
-		target = ""
+		target_str = ""
 	else:
-		target = args[0]
+		target_str = args[0]
 	
-	var opt: Option = act.rwxapi_changedir(target)
+	var opt: Option = act.rwxapi_changedir(target_str)
 	
 	if not opt.status():
 		return opt
