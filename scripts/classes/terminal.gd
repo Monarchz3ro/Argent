@@ -72,29 +72,34 @@ func get_file_at_path(path: String) -> Option:
 func stringify_stack() -> String:
 	var stackstring: String = "/"
 	for stack in stack_tracker:
+		if not stack: 
+			continue
 		stackstring += stack+"/"
-	return "/"+stackstring
+	return stackstring
 
 func get_abfs_at_path(path: String) -> Option:
-	
-	#turn it into absolute
+	#cast into abspath
 	if path[0] != "/":
 		path = stringify_stack() + path
 	
-	#split up into paths
 	var path_stack = path.split("/")
 	
-	var directory_currently_held: AbstractFS = self.root
+	var directory_currently_held: AbstractFS
+	if path[0] == "/":
+		directory_currently_held = self.root
+	else:
+		directory_currently_held = self.cwd  #or use curdir if relative
 	
 	for iterating_path in path_stack:
+		if iterating_path == "":
+			continue
+
 		if directory_currently_held.type == "Filetype":
 			return Option.error("A file cannot have children beneath it.")
 		elif iterating_path == "..":
 			directory_currently_held = directory_currently_held.parent
 		elif iterating_path == ".":
 			continue
-		elif iterating_path == "":
-			directory_currently_held = root
 		else:
 			var option: Option = directory_currently_held.get_child_named(iterating_path)
 			if not option.status():
@@ -102,6 +107,7 @@ func get_abfs_at_path(path: String) -> Option:
 			directory_currently_held = option.unwrap()
 	
 	return Option.OK(directory_currently_held)
+
 
 func create_passwd_shadow_group(etc_dir: Directory) -> void:
 	var passwd = etc_dir.writefile_sys("passwd", "")
