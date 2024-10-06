@@ -31,17 +31,16 @@ func refresh_commands() -> void:
 		if not opt.status():
 			print("Failure while processing PATH variable: "+path+" "+opt.err)
 			continue
-		else:
-			#now process all children of the necessary PATH
-			var iteration: Directory = opt.unwrap()
-			for child in iteration.children:
-				#process children
-				if child.type != "Filetype":
-					continue #skip directories
-				
-				var meta = child.metadata
-				if meta.has("executable_key"):
-					commands_dict[child.label] = meta["executable_key"]
+		#now process all children of the necessary PATH
+		var iteration: Directory = opt.unwrap()
+		for child in iteration.children:
+			#process children
+			if child.type != "Filetype":
+				continue #skip directories
+			
+			var meta = child.metadata
+			if meta.has("executable_key"):
+				commands_dict[child.label] = meta["executable_key"]
 
 func get_dir_at_path(path: String) -> Option:
 	var opt: Option = get_abfs_at_path(path)
@@ -78,8 +77,6 @@ func stringify_stack() -> String:
 
 func get_abfs_at_path(path: String) -> Option:
 	
-	var OutputError: Option = Option.new()
-	
 	#turn it into absolute
 	if path[0] != "/":
 		path = stringify_stack() + path
@@ -91,8 +88,7 @@ func get_abfs_at_path(path: String) -> Option:
 	
 	for iterating_path in path_stack:
 		if directory_currently_held.type == "Filetype":
-			OutputError.err = "A file cannot have children beneath it."
-			return OutputError
+			return Option.error("A file cannot have children beneath it.")
 		elif iterating_path == "..":
 			directory_currently_held = directory_currently_held.parent
 		elif iterating_path == ".":
@@ -101,15 +97,15 @@ func get_abfs_at_path(path: String) -> Option:
 			directory_currently_held = root
 		else:
 			var option: Option = directory_currently_held.get_child_named(iterating_path)
-			if option.status():
-				directory_currently_held = option.result
-			else:
-				return option
+			if not option.status():
+				#check again for dir/ form
+				var option2: Option = directory_currently_held.get_child_named(iterating_path+"/")
+				if not option.status():
+					return option2
+				directory_currently_held = option2.unwrap()
+			directory_currently_held = option.unwrap()
 	
-	OutputError.result = directory_currently_held
-	OutputError.err = "OK"
-	
-	return OutputError 
+	return Option.OK(directory_currently_held)
 
 func create_passwd_shadow_group(etc_dir: Directory) -> void:
 	var passwd = etc_dir.writefile_sys("passwd", "")
@@ -130,6 +126,7 @@ func fill_up_bin() -> void:
 	materialise_command(mkdir.new(self), "mkdir")
 	materialise_command(cd.new(self), "cd")
 	materialise_command(rmdir.new(self), "rmdir")
+	materialise_command(cp.new(self), "cp")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -332,3 +329,63 @@ func rwxapi_removedir(target: String) -> Option:
 	target_parent.children.erase(target_dir)
 	target_dir.parent = null
 	return Option.OK(target_dir)
+
+#chatgpt save me
+func rwxapi_copy(actor: String, source_path: String, dest_path: String) -> Option:
+	# Check source exists
+	print("Attempting to copy from source: ", source_path, " to destination: ", dest_path)
+	var source_opt: Option = get_abfs_at_path(source_path)
+	if not source_opt.status():
+		print("Source not found: " + source_path)
+		return Option.error("Source not found: " + source_path)
+	var source_abfs: AbstractFS = source_opt.unwrap()
+	print("Source found: ", source_abfs.label, " (Type: ", source_abfs.type, ")")
+
+	# Determine if the destination is a directory or includes a new name
+	var dest_parent_path: String
+	var new_name: String
+	if dest_path.ends_with("/"): # Destination is a directory
+		print("Destination is a directory.")
+		dest_parent_path = dest_path
+		new_name = source_abfs.label # Keep original name
+	else: # Destination includes a new name
+		print("Destination includes a new name.")
+		# Find the last slash to separate parent directory and new file name
+		var slash_pos = dest_path.rfind("/")
+		print("Last slash position: ", str(slash_pos))
+		dest_parent_path = dest_path.substr(0, slash_pos + 1) # Up to the last slash
+		new_name = dest_path.substr(slash_pos + 1) # After the last slash
+		print("Destination parent path: ", dest_parent_path)
+		print("New name for the copied file/directory: ", new_name)
+
+	# Check destination directory exists
+	var dest_opt: Option = get_dir_at_path(dest_parent_path)
+	if not dest_opt.status():
+		print("Destination directory not found: " + dest_parent_path)
+		return Option.error("Destination directory not found: " + dest_parent_path)
+	var dest_dir: Directory = dest_opt.unwrap()
+	print("Destination directory found: ", dest_dir.label)
+
+	# Verify write permissions for the actor on the destination directory
+	if not rwxapi_allowed_to_perform(actor, dest_dir, "w"):
+		print("Write permission denied for actor: ", actor, " on directory: ", dest_dir.label)
+		return Option.error("Forbidden write operation: cannot write to directory " + dest_dir.label)
+	print("Write permission granted for actor: ", actor)
+
+	# Check if the destination already contains an object with the new name
+	for child in dest_dir.children:
+		print("Checking child: ", child.label)
+		if child.label == new_name:
+			print("A file or directory with the name " + new_name + " already exists in " + dest_dir.label)
+			return Option.error("A file or directory with the name " + new_name + " already exists in " + dest_dir.label)
+
+	# Perform the actual copying
+	print("Cloning the source...")
+	var cloned_abfs: AbstractFS = source_abfs.clone()
+	cloned_abfs.label = new_name # Apply the new name (if any)
+	cloned_abfs.parent = dest_dir
+	print("Appending cloned object with label: ", cloned_abfs.label, " to destination directory: ", dest_dir.label)
+	dest_dir.children.append(cloned_abfs)
+
+	print("Copy operation successful.")
+	return Option.OK(cloned_abfs)
