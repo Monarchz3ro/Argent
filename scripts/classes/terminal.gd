@@ -98,11 +98,7 @@ func get_abfs_at_path(path: String) -> Option:
 		else:
 			var option: Option = directory_currently_held.get_child_named(iterating_path)
 			if not option.status():
-				#check again for dir/ form
-				var option2: Option = directory_currently_held.get_child_named(iterating_path+"/")
-				if not option.status():
-					return option2
-				directory_currently_held = option2.unwrap()
+				return option
 			directory_currently_held = option.unwrap()
 	
 	return Option.OK(directory_currently_held)
@@ -341,29 +337,40 @@ func rwxapi_copy(actor: String, source_path: String, dest_path: String) -> Optio
 	var source_abfs: AbstractFS = source_opt.unwrap()
 	print("Source found: ", source_abfs.label, " (Type: ", source_abfs.type, ")")
 
-	# Determine if the destination is a directory or includes a new name
 	var dest_parent_path: String
 	var new_name: String
-	if dest_path.ends_with("/"): # Destination is a directory
-		print("Destination is a directory.")
+
+	# Check if the destination is a directory
+	var dest_opt: Option = get_abfs_at_path(dest_path)
+	if dest_opt.status() and dest_opt.unwrap().type == "Directory":
+		# If the destination is an existing directory
+		print("Destination is an existing directory.")
 		dest_parent_path = dest_path
 		new_name = source_abfs.label # Keep original name
-	else: # Destination includes a new name
-		print("Destination includes a new name.")
-		# Find the last slash to separate parent directory and new file name
-		var slash_pos = dest_path.rfind("/")
-		print("Last slash position: ", str(slash_pos))
-		dest_parent_path = dest_path.substr(0, slash_pos + 1) # Up to the last slash
-		new_name = dest_path.substr(slash_pos + 1) # After the last slash
-		print("Destination parent path: ", dest_parent_path)
-		print("New name for the copied file/directory: ", new_name)
+	else:
+		if dest_path.ends_with("/"): # Destination path looks like a directory
+			print("Destination is intended to be a directory.")
+			dest_parent_path = dest_path
+			new_name = source_abfs.label # Keep original name
+		else:
+			print("Destination includes a new name.")
+			# Find the last slash to separate parent directory and new file name
+			var slash_pos = dest_path.rfind("/")
+			print("Last slash position: ", str(slash_pos))
+			if slash_pos == -1:
+				dest_parent_path = "" # Treat as root if there's no slash at all
+			else:
+				dest_parent_path = dest_path.substr(0, slash_pos + 1) # Up to the last slash
+			new_name = dest_path.substr(slash_pos + 1) # After the last slash
+			print("Destination parent path: ", dest_parent_path)
+			print("New name for the copied file/directory: ", new_name)
 
 	# Check destination directory exists
-	var dest_opt: Option = get_dir_at_path(dest_parent_path)
-	if not dest_opt.status():
+	var dest_parent_opt: Option = get_dir_at_path(dest_parent_path)
+	if not dest_parent_opt.status():
 		print("Destination directory not found: " + dest_parent_path)
 		return Option.error("Destination directory not found: " + dest_parent_path)
-	var dest_dir: Directory = dest_opt.unwrap()
+	var dest_dir: Directory = dest_parent_opt.unwrap()
 	print("Destination directory found: ", dest_dir.label)
 
 	# Verify write permissions for the actor on the destination directory

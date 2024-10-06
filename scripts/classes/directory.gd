@@ -40,7 +40,7 @@ func writefile_sys(lbl: String, content: String, perms: String = "-r--------", o
 
 func get_child_named(lbl: String) -> Option:
 	for child in self.children:
-		if child.label == lbl:
+		if child.label == lbl or child._to_string() == lbl:
 			return Option.OK(child)
 	return Option.error("No such child found!")
 
