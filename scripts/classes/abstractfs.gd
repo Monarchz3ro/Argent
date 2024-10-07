@@ -91,3 +91,8 @@ func clone() -> AbstractFS:
 			cloned_fs.children.append(cloned_child)
 
 	return cloned_fs
+
+func selfdestruct() -> void:
+	var parent_dir = self.parent
+	self.parent = null
+	parent_dir.children.erase(self)

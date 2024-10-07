@@ -129,6 +129,7 @@ func fill_up_bin() -> void:
 	materialise_command(cd.new(self), "cd")
 	materialise_command(rmdir.new(self), "rmdir")
 	materialise_command(cp.new(self), "cp")
+	materialise_command(mv.new(self), "mv")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -401,4 +402,75 @@ func rwxapi_copy(actor: String, source_path: String, dest_path: String) -> Optio
 	dest_dir.children.append(cloned_abfs)
 
 	print("Copy operation successful.")
+	return Option.OK(cloned_abfs)
+
+func rwxapi_move(actor: String, source_path: String, dest_path: String) -> Option:
+	# Check source exists
+	print("Attempting to copy from source: ", source_path, " to destination: ", dest_path)
+	var source_opt: Option = get_abfs_at_path(source_path)
+	if not source_opt.status():
+		print("Source not found: " + source_path)
+		return Option.error("Source not found: " + source_path)
+	var source_abfs: AbstractFS = source_opt.unwrap()
+	print("Source found: ", source_abfs.label, " (Type: ", source_abfs.type, ")")
+
+	var dest_parent_path: String
+	var new_name: String
+
+	# Check if the destination is a directory
+	var dest_opt: Option = get_abfs_at_path(dest_path)
+	if dest_opt.status() and dest_opt.unwrap().type == "Directory":
+		# If the destination is an existing directory
+		print("Destination is an existing directory.")
+		dest_parent_path = dest_path
+		new_name = source_abfs.label # Keep original name
+	else:
+		if dest_path.ends_with("/"): # Destination path looks like a directory
+			print("Destination is intended to be a directory.")
+			dest_parent_path = dest_path
+			new_name = source_abfs.label # Keep original name
+		else:
+			print("Destination includes a new name.")
+			# Find the last slash to separate parent directory and new file name
+			var slash_pos = dest_path.rfind("/")
+			print("Last slash position: ", str(slash_pos))
+			if slash_pos == -1:
+				dest_parent_path = "" # Treat as root if there's no slash at all
+			else:
+				dest_parent_path = dest_path.substr(0, slash_pos + 1) # Up to the last slash
+			new_name = dest_path.substr(slash_pos + 1) # After the last slash
+			print("Destination parent path: ", dest_parent_path)
+			print("New name for the copied file/directory: ", new_name)
+
+	# Check destination directory exists
+	var dest_parent_opt: Option = get_dir_at_path(dest_parent_path)
+	if not dest_parent_opt.status():
+		print("Destination directory not found: " + dest_parent_path)
+		return Option.error("Destination directory not found: " + dest_parent_path)
+	var dest_dir: Directory = dest_parent_opt.unwrap()
+	print("Destination directory found: ", dest_dir.label)
+
+	# Verify write permissions for the actor on the destination directory
+	if not rwxapi_allowed_to_perform(actor, dest_dir, "w"):
+		print("Write permission denied for actor: ", actor, " on directory: ", dest_dir.label)
+		return Option.error("Forbidden write operation: cannot write to directory " + dest_dir.label)
+	print("Write permission granted for actor: ", actor)
+
+	# Check if the destination already contains an object with the new name
+	for child in dest_dir.children:
+		print("Checking child: ", child.label)
+		if child.label == new_name:
+			print("A file or directory with the name " + new_name + " already exists in " + dest_dir.label)
+			return Option.error("A file or directory with the name " + new_name + " already exists in " + dest_dir.label)
+
+	# Perform the actual moving
+	print("Cloning the source...")
+	var cloned_abfs: AbstractFS = source_abfs.clone()
+	cloned_abfs.label = new_name # Apply the new name (if any)
+	cloned_abfs.parent = dest_dir
+	print("Appending cloned object with label: ", cloned_abfs.label, " to destination directory: ", dest_dir.label)
+	dest_dir.children.append(cloned_abfs)
+	#Now free the source
+	source_abfs.selfdestruct()
+	print("Source file freed. Move complete.")
 	return Option.OK(cloned_abfs)
