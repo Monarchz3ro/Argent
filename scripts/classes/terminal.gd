@@ -88,12 +88,11 @@ func get_abfs_at_path(path: String) -> Option:
 	if path[0] == "/":
 		directory_currently_held = self.root
 	else:
-		directory_currently_held = self.cwd  #or use curdir if relative
+		directory_currently_held = self.current_directory  #or use curdir if relative
 	
 	for iterating_path in path_stack:
 		if iterating_path == "":
 			continue
-
 		if directory_currently_held.type == "Filetype":
 			return Option.error("A file cannot have children beneath it.")
 		elif iterating_path == "..":
@@ -107,7 +106,6 @@ func get_abfs_at_path(path: String) -> Option:
 			directory_currently_held = option.unwrap()
 	
 	return Option.OK(directory_currently_held)
-
 
 func create_passwd_shadow_group(etc_dir: Directory) -> void:
 	var passwd = etc_dir.writefile_sys("passwd", "")
@@ -130,13 +128,14 @@ func fill_up_bin() -> void:
 	materialise_command(rmdir.new(self), "rmdir")
 	materialise_command(cp.new(self), "cp")
 	materialise_command(mv.new(self), "mv")
+	materialise_command(rm.new(self), "rm")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
 	command.metadata["executable_key"] = comm
 	command.label = with_name
-	command.parent = bin
 	bin.children.append(command)
+	command.parent = bin
 	return command
 
 func initialise() -> void:
@@ -257,8 +256,9 @@ func rwxapi_allowed_to_perform(who: String, abfs: AbstractFS, operation: String)
 			return true
 		else:
 			return false
-	
-##for files
+
+##rwxapi main
+
 func rwxapi_create_empty_file(actor: String, create_where: Directory, with_name: String) -> Option:
 	
 	#first, check if the actor is allowed to "w" the directory
@@ -280,11 +280,6 @@ func rwxapi_list_dir(actor: String, target: Directory) -> Option:
 	#then send off the list of dirs
 	var children: Array[AbstractFS] = target.children
 	return Option.OK(children)
-
-# for directories
-#func rwxapi_change_dir(actor: String, target: Directory) -> Option:
-	#AbstractFS.panic("NOT IMPLEMENTED ERROR")
-	#return Option.error("")
 
 func rwxapi_present_working_dir() -> Option:
 	var present_dir: Directory = current_directory
@@ -318,6 +313,19 @@ func rwxapi_changedir(go_where: String) -> Option:
 	stack_tracker.assign(self.current_directory.get_full_path_str().split("/"))
 	return Option.OK("OK")
 
+func is_ancestral_dir(target: Directory) -> bool:
+	
+	#handle root case
+	if target == self.root:
+		return true
+	
+	var current_dir: Directory = self.current_directory
+	while current_dir != root:
+		if current_dir == target:
+			return true
+		current_dir = current_dir.parent
+	return false
+
 func rwxapi_removedir(target: String) -> Option:
 	var target_path = self.current_directory.get_full_path_str() + target
 	var opt: Option = self.get_dir_at_path(target_path)
@@ -326,14 +334,16 @@ func rwxapi_removedir(target: String) -> Option:
 	
 	var target_dir: Directory = opt.unwrap()
 	var target_parent: Directory = target_dir.parent
+	
+	if is_ancestral_dir(target_dir):
+		return Option.error("Not allowed to destroy an ancestral directory!")
+	
 	if not rwxapi_allowed_to_perform(self.active_user, target_parent, "w"):
 		return Option.error("Forbidden write operation: Cannot write to target's parent, thus cannot delete it.")
 	
-	target_parent.children.erase(target_dir)
-	target_dir.parent = null
+	target_dir.selfdestruct()
 	return Option.OK(target_dir)
 
-#chatgpt save me
 func rwxapi_copy(actor: String, source_path: String, dest_path: String) -> Option:
 	# Check source exists
 	print("Attempting to copy from source: ", source_path, " to destination: ", dest_path)
@@ -474,3 +484,24 @@ func rwxapi_move(actor: String, source_path: String, dest_path: String) -> Optio
 	source_abfs.selfdestruct()
 	print("Source file freed. Move complete.")
 	return Option.OK(cloned_abfs)
+
+func rwxapi_destroy(actor: String, target: String) -> Option:
+	var opt: Option = get_abfs_at_path(target)
+	if not opt:
+		return opt
+	
+	var target_abfs: AbstractFS = opt.unwrap()
+	
+	if target_abfs.type == "Directory":
+		if is_ancestral_dir(target_abfs):
+			return Option.error("Not allowed to destroy an ancestral directory!")
+	
+	if not rwxapi_allowed_to_perform(actor, target_abfs, "w"):
+		return Option.error("Forbidden write operation: failed to write to "+target_abfs.label)
+	
+	if not rwxapi_allowed_to_perform(actor, target_abfs, "x"):
+		return Option.error("Forbidden execute operation: failed to execute "+target_abfs.label)
+	
+	target_abfs.selfdestruct()
+	
+	return Option.OK("Target destroyed.")

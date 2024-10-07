@@ -79,7 +79,7 @@ func clone() -> AbstractFS:
 	for key in self.metadata.keys():
 		cloned_fs.metadata[key] = self.metadata[key]
 	
-	#if you clone the parent, it might lead to circular refs!! don't do that, fuckass
+	#if you clone the parent, it might lead to bad stuff!! don't do that, fuckass
 	cloned_fs.parent = null
 	
 	#recursively clone children of a dir
@@ -93,6 +93,11 @@ func clone() -> AbstractFS:
 	return cloned_fs
 
 func selfdestruct() -> void:
-	var parent_dir = self.parent
+	print("Destroying ",self,"!")
+	self.parent.children.erase(self)
 	self.parent = null
-	parent_dir.children.erase(self)
+	if self.type == "Directory":
+		var children_array: Array[AbstractFS] = self.children.duplicate()
+		for child in children_array:
+			child.selfdestruct()
+	print(self, " destroyed.")
