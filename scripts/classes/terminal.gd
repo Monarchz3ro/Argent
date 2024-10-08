@@ -129,6 +129,7 @@ func fill_up_bin() -> void:
 	materialise_command(cp.new(self), "cp")
 	materialise_command(mv.new(self), "mv")
 	materialise_command(rm.new(self), "rm")
+	materialise_command(uname.new(self), "uname")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
