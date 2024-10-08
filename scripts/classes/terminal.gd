@@ -130,6 +130,7 @@ func fill_up_bin() -> void:
 	materialise_command(mv.new(self), "mv")
 	materialise_command(rm.new(self), "rm")
 	materialise_command(uname.new(self), "uname")
+	materialise_command(locate.new(self), "locate")
 
 func materialise_command(comm: Command, with_name: String) -> Filetype:
 	var command: Filetype = Filetype.new(with_name)
@@ -257,6 +258,17 @@ func rwxapi_allowed_to_perform(who: String, abfs: AbstractFS, operation: String)
 			return true
 		else:
 			return false
+
+func locate_recursive(actor: String, current_dir: Directory, search_term: String, results: Array[String]) -> void:
+	if not rwxapi_allowed_to_perform(actor, current_dir, "x"):
+		return
+	
+	for child in current_dir.children:
+		if child.label.findn(search_term) != -1:
+			results.append(child.get_full_path_str())
+		
+		if child.type == "Directory":
+			locate_recursive(actor, child, search_term, results)
 
 ##rwxapi main
 
@@ -506,3 +518,10 @@ func rwxapi_destroy(actor: String, target: String) -> Option:
 	target_abfs.selfdestruct()
 	
 	return Option.OK("Target destroyed.")
+
+func rwxapi_locate(actor: String, search_term: String, start_dir: Directory = self.root) -> Option:
+	var matches: Array[String] = []
+	locate_recursive(actor, start_dir, search_term, matches)
+	if matches.size() == 0:
+		return Option.error("No matches found for: " + search_term)
+	return Option.OK(matches)
