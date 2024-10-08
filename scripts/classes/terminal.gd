@@ -312,7 +312,7 @@ func rwxapi_makedir_user(actor: String, create_where: Directory, with_name: Stri
 
 func rwxapi_changedir(go_where: String) -> Option:
 	var current_dir: Directory = self.current_directory
-	var target_opt: Option = current_dir.get_child_named(go_where)
+	var target_opt: Option = get_dir_at_path(go_where)
 	if not target_opt.status():
 		return target_opt
 	
@@ -323,6 +323,7 @@ func rwxapi_changedir(go_where: String) -> Option:
 		return Option.error("Forbidden execute operation: Not allowed to enter Directory "+target.label)
 	
 	self.current_directory = target
+	print("changing directory to ",target)
 	stack_tracker.assign(self.current_directory.get_full_path_str().split("/"))
 	return Option.OK("OK")
 

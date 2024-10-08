@@ -6,4 +6,4 @@ func action(act: Terminal, _args: Array[String], _flags: Array[String]) -> Optio
 		return Option.error("Somehow failed to fetch active dir.")
 	
 	var active_directory: Directory = active_directory_opt.unwrap()
-	return Option.OK(active_directory.get_full_path_str())
+	return Option.OK([active_directory.get_full_path_str()])
